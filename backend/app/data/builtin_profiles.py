@@ -128,7 +128,7 @@ BUILTIN_PROFILES = [
             {"ruleId": "zl_hr", "matchField": "item_name", "matchType": "exact", "matchValue": "心率", "targetCode": "HR", "targetName": "心率", "dataType": "number", "unit": "次/分", "priority": 11},
             {"ruleId": "zl_bp_sys", "matchField": "item_name", "matchType": "exact", "matchValue": "收缩压", "targetCode": "SYS_BP", "targetName": "收缩压", "dataType": "number", "unit": "mmHg", "priority": 20},
             {"ruleId": "zl_bp_dia", "matchField": "item_name", "matchType": "exact", "matchValue": "舒张压", "targetCode": "DIA_BP", "targetName": "舒张压", "dataType": "number", "unit": "mmHg", "priority": 21},
-            {"ruleId": "zl_stool", "matchField": "item_name", "matchType": "exact", "matchValue": "大便量", "targetCode": "STOOL", "targetName": "大便量", "dataType": "number", "unit": "", "priority": 40},
+            {"ruleId": "zl_stool", "matchField": "item_name", "matchType": "exact", "matchValue": "大便量", "targetCode": "STOOL", "targetName": "大便次数", "dataType": "number", "unit": "次", "priority": 40},
         ],
     },
 
