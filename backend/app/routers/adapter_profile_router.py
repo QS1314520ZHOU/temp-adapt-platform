@@ -6,14 +6,20 @@ from app.utils.response import success, error
 
 router = APIRouter(tags=["适配器模板"])
 
-profile_service = AdapterProfileService()
+_profile_service = None
+
+def get_profile_service() -> AdapterProfileService:
+    global _profile_service
+    if _profile_service is None:
+        _profile_service = AdapterProfileService()
+    return _profile_service
 
 
 @router.get("/list")
 def list_profiles():
     """获取所有适配器模板（内置 + 自定义）"""
     try:
-        result = profile_service.list_profiles()
+        result = get_profile_service().list_profiles()
         return success(result, "获取适配器模板列表成功")
     except Exception as e:
         return error(str(e), code=500)
@@ -23,7 +29,7 @@ def list_profiles():
 def get_profile(profile_code: str):
     """获取单个适配器模板详情"""
     try:
-        result = profile_service.get_profile(profile_code)
+        result = get_profile_service().get_profile(profile_code)
         if not result:
             return error(f"适配器模板 '{profile_code}' 不存在", code=404)
         return success(result, "获取适配器模板成功")
@@ -53,7 +59,7 @@ def apply_profile(data: dict = Body(...)):
         if not vendor_name:
             return error("缺少 vendorName", code=400)
 
-        result = profile_service.apply_profile(
+        result = get_profile_service().apply_profile(
             profile_code=profile_code,
             vendor_code=vendor_code,
             vendor_name=vendor_name,
@@ -74,7 +80,7 @@ def save_profile(data: dict = Body(...)):
             return error("缺少 profileCode", code=400)
         if not data.get("profileName"):
             return error("缺少 profileName", code=400)
-        result = profile_service.save_profile(data)
+        result = get_profile_service().save_profile(data)
         return success(result, "保存适配器模板成功")
     except ValueError as e:
         return error(str(e), code=400)
@@ -105,7 +111,7 @@ def save_from_vendor(data: dict = Body(...)):
         if not profile_name:
             return error("缺少 profileName", code=400)
 
-        result = profile_service.save_from_vendor(
+        result = get_profile_service().save_from_vendor(
             vendor_code=vendor_code,
             profile_code=profile_code,
             profile_name=profile_name,
@@ -123,7 +129,7 @@ def save_from_vendor(data: dict = Body(...)):
 def delete_profile(profile_code: str):
     """删除自定义适配器模板（内置模板不可删除）"""
     try:
-        result = profile_service.delete_profile(profile_code)
+        result = get_profile_service().delete_profile(profile_code)
         return success(result, "删除适配器模板成功")
     except ValueError as e:
         return error(str(e), code=400)
