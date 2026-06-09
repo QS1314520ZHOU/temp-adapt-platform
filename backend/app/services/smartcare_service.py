@@ -26,36 +26,53 @@ class SmartCareService:
     def save_datasource(self, data: dict) -> dict:
         """Insert or update a SmartCare datasource config.
 
-        If the request contains a plain ``mongoUri``, it is encrypted before
-        storage.  If ``mongoUri_encrypted`` is provided directly, it is stored
-        as-is.
+        Accepts either:
+        - ``mongoUri`` directly, or
+        - Separate fields: ``host``, ``port``, ``database``, ``username``,
+          ``password`` (assembled into a URI internally).
 
         Returns:
-            The saved datasource document (with ``mongoUri`` decrypted for the caller).
+            The saved datasource document.
         """
         col = Database.get_collection(DATASOURCE_COLLECTION)
         now = datetime.now(timezone.utc)
 
-        # Encrypt the URI if a plain one is provided
+        # Build URI from separate fields if mongoUri not provided
+        mongo_uri = data.get("mongoUri", "")
+        if not mongo_uri and data.get("host"):
+            mongo_uri = self._build_mongo_uri(
+                host=data.get("host", "localhost"),
+                port=data.get("port", 27017),
+                database=data.get("database", "SmartCare"),
+                username=data.get("username", ""),
+                password=data.get("password", ""),
+            )
+
+        # Encrypt the URI
         mongo_uri_encrypted = data.get("mongoUri_encrypted", "")
-        if "mongoUri" in data and data["mongoUri"]:
-            mongo_uri_encrypted = encrypt(data["mongoUri"])
+        if mongo_uri:
+            mongo_uri_encrypted = encrypt(mongo_uri)
 
         existing = col.find_one({"name": data["name"]}) if "name" in data else None
         ds_id = data.get("id") or data.get("_id")
-
         if ds_id:
             existing = col.find_one({"_id": ds_id})
 
         if existing:
             update_fields: dict = {
                 "name": data.get("name", existing.get("name")),
+                "host": data.get("host", existing.get("host")),
+                "port": data.get("port", existing.get("port", 27017)),
+                "username": data.get("username", existing.get("username")),
                 "mongoUri_encrypted": mongo_uri_encrypted or existing.get("mongoUri_encrypted"),
                 "database": data.get("database", existing.get("database", "SmartCare")),
                 "collections": data.get("collections", existing.get("collections", {})),
                 "enabled": data.get("enabled", True),
                 "updatedAt": now,
             }
+            # Only update password if provided
+            if data.get("password"):
+                update_fields["password_encrypted"] = encrypt(data["password"])
             col.update_one({"_id": existing["_id"]}, {"$set": update_fields})
             doc = col.find_one({"_id": existing["_id"]})
         else:
@@ -69,10 +86,26 @@ class SmartCareService:
                 updatedAt=now,
             )
             doc = ds.to_dict()
+            # Store connection fields for display/re-edit
+            doc["host"] = data.get("host", "")
+            doc["port"] = data.get("port", 27017)
+            doc["username"] = data.get("username", "")
+            if data.get("password"):
+                doc["password_encrypted"] = encrypt(data["password"])
             col.insert_one(doc)
 
         logger.info("Saved SmartCare datasource '%s'", doc.get("name"))
         return self._decrypt_doc_uri(doc)
+
+    @staticmethod
+    def _build_mongo_uri(host: str, port: int, database: str, username: str = "", password: str = "") -> str:
+        """Build a MongoDB connection URI from separate fields."""
+        if username and password:
+            from urllib.parse import quote_plus
+            user = quote_plus(username)
+            pwd = quote_plus(password)
+            return f"mongodb://{user}:{pwd}@{host}:{port}/{database}"
+        return f"mongodb://{host}:{port}/{database}"
 
     def get_datasource(self, datasource_id: Optional[str] = None) -> dict | list:
         """Return one datasource (by ID) or all datasources.
@@ -96,7 +129,7 @@ class SmartCareService:
         return [self._decrypt_doc_uri(d) for d in docs]
 
     def test_connection(self, datasource_id: str) -> dict:
-        """Test connectivity to a SmartCare datasource.
+        """Test connectivity to a SmartCare datasource by ID.
 
         Returns:
             {"success": bool, "message": str}
@@ -110,27 +143,48 @@ class SmartCareService:
         if not uri:
             return {"success": False, "message": "MongoDB URI is empty"}
 
+        return self._do_test_connection(uri, doc.get("database", "SmartCare"))
+
+    def test_connection_direct(self, data: dict) -> dict:
+        """Test connectivity using direct connection parameters.
+
+        Accepts either ``mongoUri`` or separate ``host``/``port``/``database``/
+        ``username``/``password`` fields.
+
+        Returns:
+            {"success": bool, "message": str}
+        """
+        mongo_uri = data.get("mongoUri", "")
+        if not mongo_uri and data.get("host"):
+            mongo_uri = self._build_mongo_uri(
+                host=data.get("host", "localhost"),
+                port=data.get("port", 27017),
+                database=data.get("database", "SmartCare"),
+                username=data.get("username", ""),
+                password=data.get("password", ""),
+            )
+
+        if not mongo_uri:
+            return {"success": False, "message": "未提供连接信息"}
+
+        db_name = data.get("database", "SmartCare")
+        return self._do_test_connection(mongo_uri, db_name)
+
+    def _do_test_connection(self, uri: str, db_name: str) -> dict:
+        """Low-level connection test."""
         try:
             client: MongoClient = Database.get_smartcare_client(uri)
-            # Ping the server
             client.admin.command("ping")
-            db_name = doc.get("database", "SmartCare")
             db = client[db_name]
             collection_names = db.list_collection_names()
-
-            # Update test status
-            col.update_one(
-                {"_id": datasource_id},
-                {"$set": {"testStatus": "success", "lastTestTime": datetime.now(timezone.utc)}},
-            )
-            return {"success": True, "message": f"Connected to '{db_name}', {len(collection_names)} collections found"}
+            return {
+                "success": True,
+                "message": f"连接成功，数据库 '{db_name}'，共 {len(collection_names)} 个集合",
+                "collections": collection_names,
+            }
         except Exception as e:
-            logger.exception("SmartCare connection test failed for '%s'", datasource_id)
-            col.update_one(
-                {"_id": datasource_id},
-                {"$set": {"testStatus": "failed", "lastTestTime": datetime.now(timezone.utc)}},
-            )
-            return {"success": False, "message": str(e)}
+            logger.exception("SmartCare connection test failed")
+            return {"success": False, "message": f"连接失败: {e}"}
 
     # ------------------------------------------------------------------
     # Field mapping
@@ -500,8 +554,25 @@ class SmartCareService:
     # ------------------------------------------------------------------
 
     def _decrypt_doc_uri(self, doc: dict) -> dict:
-        """Add a decrypted ``mongoUri`` field to a datasource doc for the caller."""
+        """Add a decrypted ``mongoUri`` field to a datasource doc for the caller.
+        Also ensure host/port fields are present for the frontend."""
         doc = dict(doc)
         encrypted = doc.get("mongoUri_encrypted", "")
         doc["mongoUri"] = decrypt(encrypted) if encrypted else ""
+        # Ensure host/port are present (for docs saved before this field existed)
+        if "host" not in doc and doc["mongoUri"]:
+            # Try to extract host from URI
+            try:
+                from urllib.parse import urlparse
+                parsed = urlparse(doc["mongoUri"].replace("mongodb+srv", "mongodb"))
+                doc["host"] = parsed.hostname or ""
+                doc["port"] = parsed.port or 27017
+                doc["username"] = parsed.username or ""
+            except Exception:
+                pass
+        doc.setdefault("host", "")
+        doc.setdefault("port", 27017)
+        doc.setdefault("username", "")
+        # Never expose password in response
+        doc.pop("password_encrypted", None)
         return doc
