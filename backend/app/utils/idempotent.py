@@ -52,7 +52,9 @@ def make_idempotent_key_safe(vendor_code: str, visit_no: str, patient_visit_id: 
 
 
 def make_item_key(vendor_code: str, visit_no: str, patient_visit_id: str, record_time: str, item_code: str) -> str:
-    """生成指标幂等键: vendorCode|visitNo|patientVisitId|recordTime|itemCode"""
-    # 复用主键校验
-    base = make_idempotent_key(vendor_code, visit_no, patient_visit_id, record_time)
+    """生成指标幂等键: vendorCode|visitNo|patientVisitId|recordTime|itemCode
+
+    使用 safe 版本，字段不足时降级而不是抛异常，和主记录键策略一致。
+    """
+    base = make_idempotent_key_safe(vendor_code, visit_no, patient_visit_id, record_time)
     return f"{base}|{item_code}"

@@ -124,13 +124,11 @@ BUILTIN_PROFILES = [
         },
         "itemRulesTemplate": [
             {"ruleId": "zl_temp", "matchField": "item_name", "matchType": "exact", "matchValue": "体温", "targetCode": "TEMP", "targetName": "体温", "dataType": "number", "unit": "℃", "priority": 1},
-            {"ruleId": "zl_pulse", "matchField": "item_name", "matchType": "exact", "matchValue": "脉率", "targetCode": "PULSE", "targetName": "脉搏", "dataType": "number", "unit": "次/分", "priority": 10},
+            {"ruleId": "zl_resp", "matchField": "item_name", "matchType": "exact", "matchValue": "呼吸", "targetCode": "RESP", "targetName": "呼吸", "dataType": "number", "unit": "次/分", "priority": 10},
             {"ruleId": "zl_hr", "matchField": "item_name", "matchType": "exact", "matchValue": "心率", "targetCode": "HR", "targetName": "心率", "dataType": "number", "unit": "次/分", "priority": 11},
-            {"ruleId": "zl_resp", "matchField": "item_name", "matchType": "exact", "matchValue": "呼吸", "targetCode": "RESP", "targetName": "呼吸", "dataType": "number", "unit": "次/分", "priority": 12},
-            {"ruleId": "zl_bp", "matchField": "item_name", "matchType": "exact", "matchValue": "血压", "targetCode": "BP", "targetName": "血压", "dataType": "blood_pressure", "unit": "mmHg", "splitSeparator": "/", "priority": 20},
-            {"ruleId": "zl_spo2", "matchField": "item_name", "matchType": "exact", "matchValue": "血氧", "targetCode": "SPO2", "targetName": "血氧饱和度", "dataType": "number", "unit": "%", "priority": 30},
-            {"ruleId": "zl_height", "matchField": "item_name", "matchType": "exact", "matchValue": "身高", "targetCode": "HEIGHT", "targetName": "身高", "dataType": "number", "unit": "cm", "priority": 50},
-            {"ruleId": "zl_weight", "matchField": "item_name", "matchType": "exact", "matchValue": "体重", "targetCode": "WEIGHT", "targetName": "体重", "dataType": "number", "unit": "kg", "priority": 51},
+            {"ruleId": "zl_bp_sys", "matchField": "item_name", "matchType": "exact", "matchValue": "收缩压", "targetCode": "SYS_BP", "targetName": "收缩压", "dataType": "number", "unit": "mmHg", "priority": 20},
+            {"ruleId": "zl_bp_dia", "matchField": "item_name", "matchType": "exact", "matchValue": "舒张压", "targetCode": "DIA_BP", "targetName": "舒张压", "dataType": "number", "unit": "mmHg", "priority": 21},
+            {"ruleId": "zl_stool", "matchField": "item_name", "matchType": "exact", "matchValue": "大便量", "targetCode": "STOOL", "targetName": "大便量", "dataType": "number", "unit": "", "priority": 40},
         ],
     },
 

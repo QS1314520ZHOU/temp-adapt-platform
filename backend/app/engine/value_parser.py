@@ -114,13 +114,21 @@ class ValueParser:
     @staticmethod
     def _to_number(value: Any) -> Any:
         """Convert value to a number. Returns int when the value is a whole
-        number, float otherwise.  This avoids silently converting vital-sign
-        integers like pulse 80 into 80.0, which breaks downstream schema
-        validation and reconciliation."""
+        number written without a decimal point, float otherwise.
+
+        Medical semantics matter: ``37.0`` (one decimal place, measured as
+        exactly 37.0℃) is kept as ``37.0`` (float), while ``37`` (no decimal)
+        becomes ``37`` (int).  This preserves the precision intent of the
+        original measurement."""
         try:
-            f = float(value)
+            s = str(value).strip()
+            f = float(s)
+            # If the original string contains a decimal point, keep as float
+            # to preserve precision semantics (37.0 ≠ 37 in medical context).
+            if "." in s:
+                return f
+            # No decimal point → return int if representable.
             i = int(f)
-            # Return int if the float has no fractional part.
             if f == i:
                 return i
             return f
