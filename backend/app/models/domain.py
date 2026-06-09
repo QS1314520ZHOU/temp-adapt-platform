@@ -3,7 +3,7 @@ Domain models for MongoDB documents.
 These represent the structure of documents stored in MongoDB collections.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from bson import ObjectId
@@ -45,8 +45,8 @@ class VendorConfig:
         self.accessType = accessType
         self.description = description
         self.contactInfo = contactInfo
-        self.createdAt = createdAt or datetime.utcnow()
-        self.updatedAt = updatedAt or datetime.utcnow()
+        self.createdAt = createdAt or datetime.now(timezone.utc)
+        self.updatedAt = updatedAt or datetime.now(timezone.utc)
         self.createdBy = createdBy
 
     def to_dict(self) -> Dict[str, Any]:
@@ -105,8 +105,8 @@ class AccessConfig:
         self.httpPullConfig = httpPullConfig
         self.dbViewConfig = dbViewConfig
         self.enabled = enabled
-        self.createdAt = createdAt or datetime.utcnow()
-        self.updatedAt = updatedAt or datetime.utcnow()
+        self.createdAt = createdAt or datetime.now(timezone.utc)
+        self.updatedAt = updatedAt or datetime.now(timezone.utc)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -223,8 +223,8 @@ class ParserConfig:
         self.xmlConfig = xmlConfig
         self.sqlConfig = sqlConfig
         self.enabled = enabled
-        self.createdAt = createdAt or datetime.utcnow()
-        self.updatedAt = updatedAt or datetime.utcnow()
+        self.createdAt = createdAt or datetime.now(timezone.utc)
+        self.updatedAt = updatedAt or datetime.now(timezone.utc)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -288,8 +288,8 @@ class ItemMappingRule:
         self.id = id or gen_object_id()
         self.vendorCode = vendorCode
         self.rules = rules
-        self.createdAt = createdAt or datetime.utcnow()
-        self.updatedAt = updatedAt or datetime.utcnow()
+        self.createdAt = createdAt or datetime.now(timezone.utc)
+        self.updatedAt = updatedAt or datetime.now(timezone.utc)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -338,7 +338,7 @@ class RawRecord:
         self.contentType = contentType
         self.sourceIp = sourceIp
         self.status = status
-        self.createdAt = createdAt or datetime.utcnow()
+        self.createdAt = createdAt or datetime.now(timezone.utc)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -468,8 +468,8 @@ class TemperatureRecord:
         self.idempotentKey = idempotentKey
         self.status = status
         self.source = source
-        self.createdAt = createdAt or datetime.utcnow()
-        self.updatedAt = updatedAt or datetime.utcnow()
+        self.createdAt = createdAt or datetime.now(timezone.utc)
+        self.updatedAt = updatedAt or datetime.now(timezone.utc)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -546,7 +546,7 @@ class UnmatchedItem:
         self.itemData = itemData
         self.status = status
         self.resolvedRuleId = resolvedRuleId
-        self.createdAt = createdAt or datetime.utcnow()
+        self.createdAt = createdAt or datetime.now(timezone.utc)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -615,7 +615,7 @@ class TransformLog:
         self.temperatureRecordIds = temperatureRecordIds or []
         self.errors = errors or []
         self.duration = duration
-        self.createdAt = createdAt or datetime.utcnow()
+        self.createdAt = createdAt or datetime.now(timezone.utc)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -679,8 +679,8 @@ class RetryTask:
         self.status = status
         self.lastError = lastError
         self.nextRetryTime = nextRetryTime
-        self.createdAt = createdAt or datetime.utcnow()
-        self.updatedAt = updatedAt or datetime.utcnow()
+        self.createdAt = createdAt or datetime.now(timezone.utc)
+        self.updatedAt = updatedAt or datetime.now(timezone.utc)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -740,8 +740,8 @@ class SmartCareDatasourceConfig:
         self.enabled = enabled
         self.testStatus = testStatus
         self.lastTestTime = lastTestTime
-        self.createdAt = createdAt or datetime.utcnow()
-        self.updatedAt = updatedAt or datetime.utcnow()
+        self.createdAt = createdAt or datetime.now(timezone.utc)
+        self.updatedAt = updatedAt or datetime.now(timezone.utc)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -789,8 +789,8 @@ class SmartCareFieldMapping:
         self.datasourceId = datasourceId
         self.collectionName = collectionName
         self.fieldMappings = fieldMappings or {}
-        self.createdAt = createdAt or datetime.utcnow()
-        self.updatedAt = updatedAt or datetime.utcnow()
+        self.createdAt = createdAt or datetime.now(timezone.utc)
+        self.updatedAt = updatedAt or datetime.now(timezone.utc)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -852,8 +852,8 @@ class IntakeOutputItemConfig:
         self.enabled = enabled
         self.autoDetected = autoDetected
         self.calculation = calculation
-        self.createdAt = createdAt or datetime.utcnow()
-        self.updatedAt = updatedAt or datetime.utcnow()
+        self.createdAt = createdAt or datetime.now(timezone.utc)
+        self.updatedAt = updatedAt or datetime.now(timezone.utc)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -926,7 +926,7 @@ class IntakeOutputStatRule:
         self.targetItemName = targetItemName
         self.unit = unit
         self.enabled = enabled
-        self.createdAt = createdAt or datetime.utcnow()
+        self.createdAt = createdAt or datetime.now(timezone.utc)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -997,7 +997,7 @@ class IntakeOutputResult:
         self.results = results or []
         self.rawBedsideIds = rawBedsideIds or []
         self.status = status
-        self.createdAt = createdAt or datetime.utcnow()
+        self.createdAt = createdAt or datetime.now(timezone.utc)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -1062,7 +1062,7 @@ class IntakeOutputUnmatchedItem:
         self.strVal = strVal
         self.time = time
         self.status = status
-        self.createdAt = createdAt or datetime.utcnow()
+        self.createdAt = createdAt or datetime.now(timezone.utc)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -1138,8 +1138,8 @@ class CallbackConfig:
         self.maxRetryCount = maxRetryCount
         self.retryIntervalSeconds = retryIntervalSeconds
         self.dataTemplate = dataTemplate
-        self.createdAt = createdAt or datetime.utcnow()
-        self.updatedAt = updatedAt or datetime.utcnow()
+        self.createdAt = createdAt or datetime.now(timezone.utc)
+        self.updatedAt = updatedAt or datetime.now(timezone.utc)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -1190,6 +1190,11 @@ class SyncTaskConfig:
         lastSyncStatus: Optional[str] = None,
         lastSyncCount: int = 0,
         lastError: Optional[str] = None,
+        # Bedside sync specific fields
+        datasourceId: Optional[str] = None,
+        fullSyncHours: Optional[List[int]] = None,
+        incrementalIntervalMinutes: int = 5,
+        callbackUrl: Optional[str] = None,
         createdAt: Optional[datetime] = None,
         updatedAt: Optional[datetime] = None,
     ):
@@ -1206,8 +1211,13 @@ class SyncTaskConfig:
         self.lastSyncStatus = lastSyncStatus
         self.lastSyncCount = lastSyncCount
         self.lastError = lastError
-        self.createdAt = createdAt or datetime.utcnow()
-        self.updatedAt = updatedAt or datetime.utcnow()
+        # Bedside sync
+        self.datasourceId = datasourceId
+        self.fullSyncHours = fullSyncHours or [2, 4, 8]
+        self.incrementalIntervalMinutes = incrementalIntervalMinutes
+        self.callbackUrl = callbackUrl
+        self.createdAt = createdAt or datetime.now(timezone.utc)
+        self.updatedAt = updatedAt or datetime.now(timezone.utc)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -1217,6 +1227,10 @@ class SyncTaskConfig:
             "batchSize": self.batchSize, "wardCodes": self.wardCodes,
             "lastSyncTime": self.lastSyncTime, "lastSyncStatus": self.lastSyncStatus,
             "lastSyncCount": self.lastSyncCount, "lastError": self.lastError,
+            "datasourceId": self.datasourceId,
+            "fullSyncHours": self.fullSyncHours,
+            "incrementalIntervalMinutes": self.incrementalIntervalMinutes,
+            "callbackUrl": self.callbackUrl,
             "createdAt": self.createdAt, "updatedAt": self.updatedAt,
         }
 
@@ -1230,6 +1244,10 @@ class SyncTaskConfig:
             batchSize=data.get("batchSize", 100), wardCodes=data.get("wardCodes", []),
             lastSyncTime=data.get("lastSyncTime"), lastSyncStatus=data.get("lastSyncStatus"),
             lastSyncCount=data.get("lastSyncCount", 0), lastError=data.get("lastError"),
+            datasourceId=data.get("datasourceId"),
+            fullSyncHours=data.get("fullSyncHours", [2, 4, 8]),
+            incrementalIntervalMinutes=data.get("incrementalIntervalMinutes", 5),
+            callbackUrl=data.get("callbackUrl"),
             createdAt=data.get("createdAt"), updatedAt=data.get("updatedAt"),
         )
 
@@ -1276,8 +1294,8 @@ class DepartmentConfig:
         self.syncEnabled = syncEnabled
         self.callbackEnabled = callbackEnabled
         self.remark = remark
-        self.createdAt = createdAt or datetime.utcnow()
-        self.updatedAt = updatedAt or datetime.utcnow()
+        self.createdAt = createdAt or datetime.now(timezone.utc)
+        self.updatedAt = updatedAt or datetime.now(timezone.utc)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -1340,7 +1358,7 @@ class CallbackLog:
         self.retryCount = retryCount
         self.error = error
         self.duration = duration
-        self.createdAt = createdAt or datetime.utcnow()
+        self.createdAt = createdAt or datetime.now(timezone.utc)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -1363,4 +1381,77 @@ class CallbackLog:
             responseBody=data.get("responseBody"), status=data.get("status", "pending"),
             retryCount=data.get("retryCount", 0), error=data.get("error"),
             duration=data.get("duration"), createdAt=data.get("createdAt"),
+        )
+
+
+# ---------------------------------------------------------------------------
+# Adapter Profile (适配器模板)
+# ---------------------------------------------------------------------------
+
+class AdapterProfile:
+    """内置或自定义的适配器模板，包含接入一个厂家所需的全部配置。
+
+    用户选择一个模板后，系统自动创建 VendorConfig + AccessConfig +
+    ParserConfig + ItemMappingRules，无需手动逐项配置。
+    """
+
+    def __init__(
+        self,
+        profileCode: str,
+        profileName: str,
+        id: Optional[str] = None,
+        description: Optional[str] = None,
+        tags: Optional[List[str]] = None,
+        accessType: str = "http_push",
+        vendorTemplate: Optional[Dict[str, Any]] = None,
+        accessConfigTemplate: Optional[Dict[str, Any]] = None,
+        parserConfigTemplate: Optional[Dict[str, Any]] = None,
+        itemRulesTemplate: Optional[List[Dict[str, Any]]] = None,
+        callbackConfigTemplate: Optional[Dict[str, Any]] = None,
+        isBuiltin: bool = False,
+        createdAt: Optional[datetime] = None,
+        updatedAt: Optional[datetime] = None,
+    ):
+        self.id = id or gen_object_id()
+        self.profileCode = profileCode
+        self.profileName = profileName
+        self.description = description
+        self.tags = tags or []
+        self.accessType = accessType
+        self.vendorTemplate = vendorTemplate or {}
+        self.accessConfigTemplate = accessConfigTemplate or {}
+        self.parserConfigTemplate = parserConfigTemplate or {}
+        self.itemRulesTemplate = itemRulesTemplate or []
+        self.callbackConfigTemplate = callbackConfigTemplate or {}
+        self.isBuiltin = isBuiltin
+        self.createdAt = createdAt or datetime.now(timezone.utc)
+        self.updatedAt = updatedAt or datetime.now(timezone.utc)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "_id": self.id, "profileCode": self.profileCode,
+            "profileName": self.profileName, "description": self.description,
+            "tags": self.tags, "accessType": self.accessType,
+            "vendorTemplate": self.vendorTemplate,
+            "accessConfigTemplate": self.accessConfigTemplate,
+            "parserConfigTemplate": self.parserConfigTemplate,
+            "itemRulesTemplate": self.itemRulesTemplate,
+            "callbackConfigTemplate": self.callbackConfigTemplate,
+            "isBuiltin": self.isBuiltin,
+            "createdAt": self.createdAt, "updatedAt": self.updatedAt,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "AdapterProfile":
+        return cls(
+            id=str(data.get("_id", "")), profileCode=data["profileCode"],
+            profileName=data["profileName"], description=data.get("description"),
+            tags=data.get("tags", []), accessType=data.get("accessType", "http_push"),
+            vendorTemplate=data.get("vendorTemplate", {}),
+            accessConfigTemplate=data.get("accessConfigTemplate", {}),
+            parserConfigTemplate=data.get("parserConfigTemplate", {}),
+            itemRulesTemplate=data.get("itemRulesTemplate", []),
+            callbackConfigTemplate=data.get("callbackConfigTemplate", {}),
+            isBuiltin=data.get("isBuiltin", False),
+            createdAt=data.get("createdAt"), updatedAt=data.get("updatedAt"),
         )

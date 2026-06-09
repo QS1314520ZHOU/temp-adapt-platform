@@ -1,6 +1,6 @@
 """Vendor configuration management service."""
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from app.database import Database
@@ -43,7 +43,7 @@ class VendorService:
         if col.find_one({"vendorCode": data["vendorCode"]}):
             raise ValueError(f"Vendor with code '{data['vendorCode']}' already exists")
 
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         vendor = VendorConfig(
             vendorCode=data["vendorCode"],
             vendorName=data["vendorName"],
@@ -83,7 +83,7 @@ class VendorService:
             if key in data:
                 update_fields[key] = data[key]
 
-        update_fields["updatedAt"] = datetime.utcnow()
+        update_fields["updatedAt"] = datetime.now(timezone.utc)
 
         col.update_one({"vendorCode": vendor_code}, {"$set": update_fields})
         logger.info("Updated vendor '%s'", vendor_code)
@@ -95,7 +95,7 @@ class VendorService:
 
         result = col.update_one(
             {"vendorCode": vendor_code},
-            {"$set": {"enabled": enabled, "updatedAt": datetime.utcnow()}},
+            {"$set": {"enabled": enabled, "updatedAt": datetime.now(timezone.utc)}},
         )
         if result.matched_count == 0:
             raise ValueError(f"Vendor '{vendor_code}' not found")

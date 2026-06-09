@@ -41,6 +41,12 @@ class SchedulerService:
 
         for config in configs:
             vendor_code = config.get("vendorCode", "")
+            sync_type = config.get("syncType", "pull")
+
+            if sync_type == "bedside_sync":
+                self._load_bedside_sync_job(config)
+                continue
+
             cron_expr = config.get("cronExpression")
             if not cron_expr:
                 continue
@@ -68,6 +74,48 @@ class SchedulerService:
                 logger.info("Loaded callback job for vendor '%s': %s", vendor_code, cron_expr)
             except Exception as e:
                 logger.error("Failed to load callback job for vendor '%s': %s", vendor_code, str(e))
+
+    def _load_bedside_sync_job(self, config: dict):
+        """Load a bedside_sync config and register two cron jobs:
+        1. Full sync at specific hours (e.g. 2am, 4am, 8am UTC+8)
+        2. Incremental check every N minutes
+        """
+        vendor_code = config.get("vendorCode", "")
+        datasource_id = config.get("datasourceId", "")
+        full_sync_hours = config.get("fullSyncHours", [2, 4, 8])
+        interval_minutes = config.get("incrementalIntervalMinutes", 5)
+        lookback_days = config.get("lookbackDays", 7)
+        callback_url = config.get("callbackUrl")
+        ward_codes = config.get("wardCodes", [])
+
+        if not datasource_id:
+            logger.warning("Bedside sync for vendor '%s' has no datasourceId, skipping", vendor_code)
+            return
+
+        # 1. Full sync job: at specific hours, minute 0
+        hours_str = ",".join(str(h) for h in full_sync_hours)
+        full_cron = f"0 {hours_str} * * *"
+        full_job_id = f"bedside_full_{vendor_code}"
+        self.scheduler.add_job(
+            self._run_bedside_full_sync,
+            CronTrigger.from_crontab(full_cron),
+            args=[vendor_code, datasource_id, lookback_days, callback_url, ward_codes],
+            id=full_job_id,
+            replace_existing=True,
+        )
+        logger.info("Loaded bedside full sync job '%s': hours=%s, lookback=%dd", full_job_id, full_sync_hours, lookback_days)
+
+        # 2. Incremental check job: every N minutes
+        incr_cron = f"*/{interval_minutes} * * * *"
+        incr_job_id = f"bedside_incr_{vendor_code}"
+        self.scheduler.add_job(
+            self._run_bedside_incr_sync,
+            CronTrigger.from_crontab(incr_cron),
+            args=[vendor_code, datasource_id, callback_url, ward_codes],
+            id=incr_job_id,
+            replace_existing=True,
+        )
+        logger.info("Loaded bedside incremental sync job '%s': every %d min", incr_job_id, interval_minutes)
 
     def add_sync_job(self, vendor_code: str, cron_expression: str):
         """Add or update a sync cron job for a vendor."""
@@ -132,6 +180,38 @@ class SchedulerService:
             logger.info("Scheduled sync for vendor '%s': success=%s", vendor_code, result.get("success"))
         except Exception as e:
             logger.exception("Scheduled sync failed for vendor '%s': %s", vendor_code, str(e))
+
+    def _run_bedside_full_sync(self, vendor_code: str, datasource_id: str,
+                                lookback_days: int, callback_url: str, ward_codes: list):
+        """Execute bedside full sync at scheduled hours."""
+        from app.services.bedside_sync_service import bedside_sync_service
+        try:
+            result = bedside_sync_service.full_sync(
+                vendor_code=vendor_code,
+                datasource_id=datasource_id,
+                lookback_days=lookback_days,
+                callback_url=callback_url,
+                ward_codes=ward_codes or None,
+            )
+            logger.info("Bedside full sync vendor='%s': %s", vendor_code, result)
+        except Exception as e:
+            logger.exception("Bedside full sync failed for vendor '%s': %s", vendor_code, str(e))
+
+    def _run_bedside_incr_sync(self, vendor_code: str, datasource_id: str,
+                                callback_url: str, ward_codes: list):
+        """Execute bedside incremental check."""
+        from app.services.bedside_sync_service import bedside_sync_service
+        try:
+            result = bedside_sync_service.incremental_sync(
+                vendor_code=vendor_code,
+                datasource_id=datasource_id,
+                callback_url=callback_url,
+                ward_codes=ward_codes or None,
+            )
+            if result.get("recordCount", 0) > 0:
+                logger.info("Bedside incr sync vendor='%s': %d updates", vendor_code, result["recordCount"])
+        except Exception as e:
+            logger.exception("Bedside incr sync failed for vendor '%s': %s", vendor_code, str(e))
 
     def _run_callback(self, vendor_code: str):
         """Execute a callback task (called by the scheduler).

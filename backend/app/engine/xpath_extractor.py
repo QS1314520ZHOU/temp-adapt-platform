@@ -41,6 +41,35 @@ class XPathExtractor:
             logger.error("XPath extract failed for path '%s': %s", xpath, e)
             return []
 
+    def extract_from_node(
+        self,
+        node,
+        xpath: str,
+        namespaces: Optional[dict] = None,
+    ) -> list:
+        """Extract nodes matching an XPath expression from an existing lxml node.
+
+        Unlike :meth:`extract_from_string`, this does **not** re-parse XML;
+        it operates directly on the given node, avoiding the bug of passing
+        an empty string to ``etree.fromstring``.
+
+        Args:
+            node: An ``lxml.etree._Element`` node.
+            xpath: An XPath expression relative to *node*.
+            namespaces: Optional dict of namespace prefixes to URIs.
+
+        Returns:
+            A list of matching ``lxml.etree._Element`` nodes.
+        """
+        try:
+            results = node.xpath(xpath, namespaces=namespaces or {})
+            if isinstance(results, list):
+                return results
+            return [results]
+        except Exception as e:
+            logger.error("XPath extract_from_node failed for path '%s': %s", xpath, e)
+            return []
+
     def extract_text(self, node, xpath: str) -> Optional[str]:
         """Extract the text content from an lxml node using an XPath expression.
 

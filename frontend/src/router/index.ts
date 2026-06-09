@@ -12,6 +12,11 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/VendorList.vue'),
   },
   {
+    path: '/adapter-catalog',
+    name: 'AdapterCatalog',
+    component: () => import('@/views/AdapterCatalog.vue'),
+  },
+  {
     path: '/access-config',
     name: 'AccessConfig',
     component: () => import('@/views/AccessConfig.vue'),

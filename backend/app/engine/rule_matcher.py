@@ -20,10 +20,22 @@ class RuleMatcher:
 
     Rules are sorted by ``priority`` (ascending -- lower number = higher
     priority).  The first matching rule wins.
+
+    Regex patterns are pre-compiled at init time and cached on the rule
+    dict (``rule["_compiled_re"]``) to avoid repeated compilation on every
+    match call.
     """
 
     def __init__(self, rules: list[dict]) -> None:
         self.rules: list[dict] = sorted(rules, key=lambda r: r.get("priority", 9999))
+        # Pre-compile regex patterns to avoid re.compile on every match.
+        for rule in self.rules:
+            if rule.get("matchType") == "regex" and rule.get("matchValue"):
+                try:
+                    rule["_compiled_re"] = re.compile(str(rule["matchValue"]))
+                except re.error as e:
+                    logger.error("Invalid regex pattern '%s' in rule %s: %s", rule["matchValue"], rule, e)
+                    rule["_compiled_re"] = None
 
     def match(self, item: dict) -> Optional[dict]:
         """Try to match *item* against every rule, in priority order.
@@ -90,13 +102,24 @@ class RuleMatcher:
                 return str(match_value) in item_value_str
 
             if match_type == "regex":
-                return bool(re.match(str(match_value), item_value_str))
+                compiled = rule.get("_compiled_re")
+                if compiled is None:
+                    return False
+                return bool(compiled.search(item_value_str))
 
             if match_type == "starts_with":
                 return item_value_str.startswith(str(match_value))
 
             if match_type == "in_list":
-                allowed = [v.strip() for v in str(match_value).split(",")]
+                # Support list, newline-separated, or comma-separated values.
+                # Priority: list > newline > comma.
+                # Using newline in the UI lets users include commas in values.
+                if isinstance(match_value, list):
+                    allowed = [str(v).strip() for v in match_value]
+                elif "\n" in str(match_value):
+                    allowed = [v.strip() for v in str(match_value).split("\n") if v.strip()]
+                else:
+                    allowed = [v.strip() for v in str(match_value).split(",")]
                 return item_value_str in allowed
 
         except Exception as e:

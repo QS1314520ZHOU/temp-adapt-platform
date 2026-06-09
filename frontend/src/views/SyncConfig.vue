@@ -26,36 +26,77 @@
           <el-select v-model="formData.syncType" placeholder="请选择同步类型" style="width: 100%">
             <el-option label="HTTP拉取" value="pull" />
             <el-option label="数据库视图" value="db_view" />
+            <el-option label="Bedside增量同步" value="bedside_sync" />
           </el-select>
         </el-form-item>
 
-        <el-form-item label="定时表达式" prop="cronExpression">
-          <el-input v-model="formData.cronExpression" placeholder="0 */5 * * *" />
-          <div class="form-tip">如: 0 */5 * * * 表示每5分钟</div>
-        </el-form-item>
+        <!-- Bedside 同步特有配置 -->
+        <template v-if="formData.syncType === 'bedside_sync'">
+          <el-form-item label="SmartCare数据源" prop="datasourceId">
+            <el-input v-model="formData.datasourceId" placeholder="SmartCare datasource ID" />
+            <div class="form-tip">在 SmartCare 数据源页面获取</div>
+          </el-form-item>
 
-        <el-form-item label="回溯天数" prop="lookbackDays">
-          <el-input-number v-model="formData.lookbackDays" :min="1" :max="30" />
-          <div class="form-tip">每次同步回溯多少天的数据</div>
-        </el-form-item>
+          <el-form-item label="全量同步时间点" prop="fullSyncHours">
+            <el-input v-model="formData.fullSyncHoursStr" placeholder="2,4,8" />
+            <div class="form-tip">UTC+8 时间，用逗号分隔。如 2,4,8 表示凌晨2点、4点、8点各跑一次全量</div>
+          </el-form-item>
 
-        <el-form-item label="同步窗口(小时)" prop="syncWindowHours">
-          <el-input-number v-model="formData.syncWindowHours" :min="1" :max="48" />
-          <div class="form-tip">同步时间窗口（小时）</div>
-        </el-form-item>
+          <el-form-item label="增量检查间隔(分钟)" prop="incrementalIntervalMinutes">
+            <el-input-number v-model="formData.incrementalIntervalMinutes" :min="1" :max="60" />
+            <div class="form-tip">每隔N分钟检查一次 editTime 变更</div>
+          </el-form-item>
 
-        <el-form-item label="批次大小" prop="batchSize">
-          <el-input-number v-model="formData.batchSize" :min="1" :max="1000" />
-        </el-form-item>
+          <el-form-item label="回溯天数" prop="lookbackDays">
+            <el-input-number v-model="formData.lookbackDays" :min="1" :max="30" />
+            <div class="form-tip">首次同步或全量同步时，回溯N天内有修改的记录</div>
+          </el-form-item>
 
-        <el-form-item label="科室编码">
-          <el-input v-model="formData.wardCodes" placeholder="多个编码用逗号分隔" />
-          <div class="form-tip">留空表示同步所有科室</div>
-        </el-form-item>
+          <el-form-item label="回传地址">
+            <el-input v-model="formData.callbackUrl" placeholder="http://target:8080/api/receive" />
+            <div class="form-tip">留空则使用回传配置中的地址</div>
+          </el-form-item>
+
+          <el-form-item label="科室编码">
+            <el-input v-model="formData.wardCodes" placeholder="多个编码用逗号分隔" />
+            <div class="form-tip">留空表示同步所有科室</div>
+          </el-form-item>
+        </template>
+
+        <!-- 非 bedside 同步的通用配置 -->
+        <template v-else>
+          <el-form-item label="定时表达式" prop="cronExpression">
+            <el-input v-model="formData.cronExpression" placeholder="0 */5 * * *" />
+            <div class="form-tip">如: 0 */5 * * * 表示每5分钟</div>
+          </el-form-item>
+
+          <el-form-item label="回溯天数" prop="lookbackDays">
+            <el-input-number v-model="formData.lookbackDays" :min="1" :max="30" />
+            <div class="form-tip">每次同步回溯多少天的数据</div>
+          </el-form-item>
+
+          <el-form-item label="同步窗口(小时)" prop="syncWindowHours">
+            <el-input-number v-model="formData.syncWindowHours" :min="1" :max="48" />
+            <div class="form-tip">同步时间窗口（小时）</div>
+          </el-form-item>
+
+          <el-form-item label="批次大小" prop="batchSize">
+            <el-input-number v-model="formData.batchSize" :min="1" :max="1000" />
+          </el-form-item>
+
+          <el-form-item label="科室编码">
+            <el-input v-model="formData.wardCodes" placeholder="多个编码用逗号分隔" />
+            <div class="form-tip">留空表示同步所有科室</div>
+          </el-form-item>
+        </template>
 
         <el-form-item>
           <el-button type="primary" @click="handleSave" :loading="saving">保存</el-button>
-          <el-button type="warning" @click="handleManualSync" :loading="syncing">立即同步</el-button>
+          <template v-if="formData.syncType === 'bedside_sync'">
+            <el-button type="warning" @click="handleBedsideFullSync" :loading="syncing">手动全量同步</el-button>
+            <el-button type="success" @click="handleBedsideIncrSync" :loading="syncing">手动增量检查</el-button>
+          </template>
+          <el-button v-else type="warning" @click="handleManualSync" :loading="syncing">立即同步</el-button>
         </el-form-item>
       </el-form>
 
@@ -99,7 +140,7 @@
         </el-table-column>
         <el-table-column prop="syncType" label="同步类型" width="120">
           <template #default="{ row }">
-            {{ row.syncType === 'pull' ? 'HTTP拉取' : '数据库视图' }}
+            {{ row.syncType === 'pull' ? 'HTTP拉取' : row.syncType === 'bedside_sync' ? 'Bedside增量' : '数据库视图' }}
           </template>
         </el-table-column>
         <el-table-column prop="cronExpression" label="定时表达式" width="150" />
@@ -158,6 +199,11 @@ interface SyncConfigForm {
   syncWindowHours: number
   batchSize: number
   wardCodes: string
+  // bedside sync fields
+  datasourceId: string
+  fullSyncHoursStr: string
+  incrementalIntervalMinutes: number
+  callbackUrl: string
 }
 
 // 同步状态
@@ -201,7 +247,11 @@ const formData = reactive<SyncConfigForm>({
   lookbackDays: 1,
   syncWindowHours: 24,
   batchSize: 100,
-  wardCodes: ''
+  wardCodes: '',
+  datasourceId: '',
+  fullSyncHoursStr: '2,4,8',
+  incrementalIntervalMinutes: 5,
+  callbackUrl: ''
 })
 
 const formRules: FormRules = {
@@ -260,6 +310,10 @@ const loadConfig = async (vendorCode: string) => {
     const data = res.data?.data || res.data
     if (data) {
       Object.assign(formData, data)
+      // Convert fullSyncHours array to string for display
+      if (Array.isArray(data.fullSyncHours)) {
+        formData.fullSyncHoursStr = data.fullSyncHours.join(',')
+      }
     }
   } catch {
     ElMessage.error('加载同步配置失败')
@@ -286,10 +340,15 @@ const handleSave = async () => {
     if (valid) {
       saving.value = true
       try {
-        await request.post('/api/sync/config', {
+        const payload: Record<string, any> = {
           vendorCode: selectedVendor.value,
           ...formData
-        })
+        }
+        // Convert fullSyncHoursStr to array for bedside_sync
+        if (formData.syncType === 'bedside_sync' && formData.fullSyncHoursStr) {
+          payload.fullSyncHours = formData.fullSyncHoursStr.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n))
+        }
+        await request.post('/api/sync/config', payload)
         ElMessage.success('保存成功')
         fetchAllSyncConfigs()
       } catch {
@@ -312,6 +371,35 @@ const handleManualSync = async () => {
     setTimeout(() => fetchSyncStatus(selectedVendor.value), 2000)
   } catch {
     ElMessage.error('触发同步失败')
+  } finally {
+    syncing.value = false
+  }
+}
+
+// Bedside 全量同步
+const handleBedsideFullSync = async () => {
+  syncing.value = true
+  try {
+    const res = await request.post(`/api/sync/bedside/full/${selectedVendor.value}`)
+    ElMessage.success(`全量同步完成，共 ${res.data?.data?.recordCount ?? 0} 条记录`)
+    setTimeout(() => fetchSyncStatus(selectedVendor.value), 1000)
+  } catch {
+    ElMessage.error('全量同步失败')
+  } finally {
+    syncing.value = false
+  }
+}
+
+// Bedside 增量检查
+const handleBedsideIncrSync = async () => {
+  syncing.value = true
+  try {
+    const res = await request.post(`/api/sync/bedside/incremental/${selectedVendor.value}`)
+    const count = res.data?.data?.recordCount ?? 0
+    ElMessage.success(count > 0 ? `增量检查完成，发现 ${count} 条更新` : '无更新')
+    setTimeout(() => fetchSyncStatus(selectedVendor.value), 1000)
+  } catch {
+    ElMessage.error('增量检查失败')
   } finally {
     syncing.value = false
   }

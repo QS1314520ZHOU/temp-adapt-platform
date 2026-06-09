@@ -1,6 +1,6 @@
 """Sync task service - manage scheduled sync configurations and execution."""
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from app.database import Database
@@ -22,7 +22,7 @@ class SyncService:
     def save_config(self, data: dict) -> dict:
         """Insert or update a sync task config (upsert by vendorCode)."""
         col = Database.get_collection(self.COLLECTION)
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
 
         existing = col.find_one({"vendorCode": data["vendorCode"]})
         if existing:
@@ -30,6 +30,8 @@ class SyncService:
             for key in (
                 "enabled", "syncType", "cronExpression", "lookbackDays",
                 "syncWindowHours", "batchSize", "wardCodes",
+                "datasourceId", "fullSyncHours", "incrementalIntervalMinutes",
+                "callbackUrl",
             ):
                 if key in data:
                     update_fields[key] = data[key]
@@ -47,6 +49,10 @@ class SyncService:
                 syncWindowHours=data.get("syncWindowHours", 24),
                 batchSize=data.get("batchSize", 100),
                 wardCodes=data.get("wardCodes"),
+                datasourceId=data.get("datasourceId"),
+                fullSyncHours=data.get("fullSyncHours", [2, 4, 8]),
+                incrementalIntervalMinutes=data.get("incrementalIntervalMinutes", 5),
+                callbackUrl=data.get("callbackUrl"),
                 createdAt=now,
                 updatedAt=now,
             )
@@ -86,7 +92,7 @@ class SyncService:
             return {"success": False, "error": f"Sync is disabled for vendor '{vendor_code}'"}
 
         col = Database.get_collection(self.COLLECTION)
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
 
         # Calculate sync time window
         last_sync_time = config.get("lastSyncTime")

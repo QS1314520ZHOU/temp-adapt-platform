@@ -44,6 +44,7 @@ from app.routers.department_router import router as department_router
 from app.routers.scheduler_router import router as scheduler_router
 from app.routers.dashboard_router import router as dashboard_router
 from app.routers.soap_router import router as soap_router
+from app.routers.adapter_profile_router import router as adapter_profile_router
 
 app = FastAPI(title="体温单回传适配平台", version="1.0.0", default_response_class=MongoJSONResponse)
 
@@ -94,3 +95,4 @@ app.include_router(department_router,  prefix="/api/department")
 app.include_router(scheduler_router,   prefix="/api/scheduler")
 app.include_router(dashboard_router,   prefix="/api/dashboard")
 app.include_router(soap_router,        prefix="/api/soap")
+app.include_router(adapter_profile_router, prefix="/api/adapter-profile")

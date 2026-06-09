@@ -1,6 +1,6 @@
 """SmartCare MongoDB datasource management service."""
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from bson import ObjectId
@@ -34,7 +34,7 @@ class SmartCareService:
             The saved datasource document (with ``mongoUri`` decrypted for the caller).
         """
         col = Database.get_collection(DATASOURCE_COLLECTION)
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
 
         # Encrypt the URI if a plain one is provided
         mongo_uri_encrypted = data.get("mongoUri_encrypted", "")
@@ -121,14 +121,14 @@ class SmartCareService:
             # Update test status
             col.update_one(
                 {"_id": datasource_id},
-                {"$set": {"testStatus": "success", "lastTestTime": datetime.utcnow()}},
+                {"$set": {"testStatus": "success", "lastTestTime": datetime.now(timezone.utc)}},
             )
             return {"success": True, "message": f"Connected to '{db_name}', {len(collection_names)} collections found"}
         except Exception as e:
             logger.exception("SmartCare connection test failed for '%s'", datasource_id)
             col.update_one(
                 {"_id": datasource_id},
-                {"$set": {"testStatus": "failed", "lastTestTime": datetime.utcnow()}},
+                {"$set": {"testStatus": "failed", "lastTestTime": datetime.now(timezone.utc)}},
             )
             return {"success": False, "message": str(e)}
 
@@ -143,7 +143,7 @@ class SmartCareService:
             The saved field mapping document.
         """
         col = Database.get_collection(FIELD_MAPPING_COLLECTION)
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
 
         ds_id = data.get("datasourceId", "")
         coll_name = data.get("collectionName", "")
@@ -415,6 +415,85 @@ class SmartCareService:
             doc.pop("_id", None)
             result.append(self._apply_field_mapping(doc, field_map, reverse=True))
         return result
+
+    # ------------------------------------------------------------------
+    # Bedside sync support (editTime-based incremental)
+    # ------------------------------------------------------------------
+
+    def get_bedside_modified(
+        self,
+        datasource_id: str,
+        since,
+        ward_codes: Optional[list] = None,
+        patient_ids: Optional[list] = None,
+        time_start=None,
+        time_end=None,
+        limit: int = 5000,
+    ) -> list:
+        """Query bedside records modified after *since* (editTime-based).
+
+        This is the core method for incremental sync: it returns records
+        whose ``editTime`` is newer than the last sync checkpoint, optionally
+        filtered by bedside ``time`` range and ward.
+
+        Args:
+            datasource_id: SmartCare datasource ID.
+            since: Only return records with editTime >= this value.
+            ward_codes: Optional list of ward codes to filter.
+            patient_ids: Optional list of patient IDs to filter.
+            time_start: Optional bedside time range start (UTC+8).
+            time_end: Optional bedside time range end (UTC+8).
+            limit: Max records to return.
+
+        Returns:
+            List of bedside record dicts with standard field names.
+        """
+        field_map = self._get_field_mappings(datasource_id, "bedside")
+        coll = self._get_sc_collection(datasource_id, "bedside")
+
+        # Map standard → actual field names
+        edit_key = field_map.get("editTime", "editTime")
+        time_key = field_map.get("recordTime", "recordTime")  # bedside time
+        patient_key = field_map.get("patientId", "patientId")
+        ward_key = field_map.get("wardCode", "wardCode")
+
+        query: dict = {edit_key: {"$gte": since}}
+
+        # Optional: filter by bedside time range (for full sync at specific hours)
+        if time_start or time_end:
+            time_filter: dict = {}
+            if time_start:
+                time_filter["$gte"] = time_start
+            if time_end:
+                time_filter["$lte"] = time_end
+            query[time_key] = time_filter
+
+        if patient_ids:
+            query[patient_key] = {"$in": patient_ids}
+
+        if ward_codes:
+            query[ward_key] = {"$in": ward_codes}
+
+        docs = list(coll.find(query).sort(edit_key, 1).limit(limit))
+        result: list[dict] = []
+        for doc in docs:
+            doc.pop("_id", None)
+            result.append(self._apply_field_mapping(doc, field_map, reverse=True))
+        return result
+
+    def get_latest_edit_time(self, datasource_id: str) -> Optional[datetime]:
+        """Return the most recent editTime across all bedside records.
+
+        Used to set the initial sync checkpoint.
+        """
+        field_map = self._get_field_mappings(datasource_id, "bedside")
+        coll = self._get_sc_collection(datasource_id, "bedside")
+        edit_key = field_map.get("editTime", "editTime")
+
+        doc = coll.find_one(sort=[(edit_key, -1)])
+        if doc and edit_key in doc:
+            return doc[edit_key]
+        return None
 
     # ------------------------------------------------------------------
     # Internal helpers

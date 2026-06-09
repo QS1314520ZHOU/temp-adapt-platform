@@ -1,6 +1,6 @@
 """Access configuration management service."""
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 import httpx
@@ -25,7 +25,7 @@ class AccessConfigService:
     def save_config(self, data: dict) -> dict:
         """Insert or upsert an access config and return the saved document."""
         col = Database.get_collection(COLLECTION)
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
 
         existing = col.find_one({"vendorCode": data["vendorCode"]})
 

@@ -1,6 +1,6 @@
 """Item mapping rule management service."""
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from app.database import Database
@@ -23,7 +23,7 @@ class ItemRuleService:
     def save_rules(self, data: dict) -> dict:
         """Insert or upsert item mapping rules and return the saved document."""
         col = Database.get_collection(COLLECTION)
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
 
         existing = col.find_one({"vendorCode": data["vendorCode"]})
 
@@ -55,7 +55,7 @@ class ItemRuleService:
             The updated rules document.
         """
         col = Database.get_collection(COLLECTION)
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
 
         existing = col.find_one({"vendorCode": vendor_code})
 
@@ -93,7 +93,7 @@ class ItemRuleService:
             ValueError: If the vendor or rule is not found.
         """
         col = Database.get_collection(COLLECTION)
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
 
         existing = col.find_one({"vendorCode": vendor_code})
         if not existing:

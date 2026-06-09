@@ -1,6 +1,6 @@
 """Retry service for re-processing failed transform records."""
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from app.database import Database
@@ -44,7 +44,7 @@ class RetryService:
             maxRetryCount=5,
             status="pending",
             lastError=error,
-            nextRetryTime=datetime.utcnow(),
+            nextRetryTime=datetime.now(timezone.utc),
         )
         doc = task.to_dict()
         col.insert_one(doc)
@@ -73,14 +73,14 @@ class RetryService:
         if task.retryCount >= task.maxRetryCount:
             tasks_col.update_one(
                 {"_id": task_id},
-                {"$set": {"status": "exhausted", "updatedAt": datetime.utcnow()}},
+                {"$set": {"status": "exhausted", "updatedAt": datetime.now(timezone.utc)}},
             )
             return {"success": False, "taskId": task_id, "error": "Max retry count reached"}
 
         # Mark as running
         tasks_col.update_one(
             {"_id": task_id},
-            {"$set": {"status": "running", "updatedAt": datetime.utcnow()}},
+            {"$set": {"status": "running", "updatedAt": datetime.now(timezone.utc)}},
         )
 
         try:
@@ -92,13 +92,13 @@ class RetryService:
                     {"$set": {
                         "status": "success",
                         "retryCount": task.retryCount + 1,
-                        "updatedAt": datetime.utcnow(),
+                        "updatedAt": datetime.now(timezone.utc),
                     }},
                 )
                 return {"success": True, "taskId": task_id}
             else:
                 new_count = task.retryCount + 1
-                next_retry = datetime.utcnow() + timedelta(minutes=min(2 ** new_count, 60))
+                next_retry = datetime.now(timezone.utc) + timedelta(minutes=min(2 ** new_count, 60))
                 tasks_col.update_one(
                     {"_id": task_id},
                     {"$set": {
@@ -106,7 +106,7 @@ class RetryService:
                         "retryCount": new_count,
                         "lastError": result.get("error", "Unknown error"),
                         "nextRetryTime": next_retry,
-                        "updatedAt": datetime.utcnow(),
+                        "updatedAt": datetime.now(timezone.utc),
                     }},
                 )
                 return {"success": False, "taskId": task_id, "error": result.get("error", "Unknown error")}
@@ -119,7 +119,7 @@ class RetryService:
                     "status": "failed",
                     "retryCount": task.retryCount + 1,
                     "lastError": str(e),
-                    "updatedAt": datetime.utcnow(),
+                    "updatedAt": datetime.now(timezone.utc),
                 }},
             )
             return {"success": False, "taskId": task_id, "error": str(e)}
@@ -193,7 +193,7 @@ class RetryService:
             {"processed": int, "success": int, "fail": int}
         """
         tasks = self.get_pending_tasks(limit=100)
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
 
         success_count = 0
         fail_count = 0

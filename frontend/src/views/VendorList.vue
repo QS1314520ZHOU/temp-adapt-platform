@@ -15,9 +15,13 @@
           </el-button>
         </div>
         <div class="toolbar-right">
+          <el-button type="success" @click="handleAddFromTemplate">
+            <el-icon><Box /></el-icon>
+            从模板创建
+          </el-button>
           <el-button type="primary" @click="handleAdd">
             <el-icon><Plus /></el-icon>
-            新增厂家
+            手动新增
           </el-button>
         </div>
       </div>
@@ -93,7 +97,8 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
-import { Search, Plus, Edit, Delete } from '@element-plus/icons-vue'
+import { useRouter } from 'vue-router'
+import { Search, Plus, Edit, Delete, Box } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import request from '@/api/request'
@@ -110,6 +115,8 @@ interface Vendor {
   contactInfo: string
   enabled: boolean
 }
+
+const router = useRouter()
 
 // 搜索关键词
 const searchKeyword = ref('')
@@ -175,6 +182,11 @@ const formRules: FormRules = {
 // 搜索
 const handleSearch = () => {
   // 实际可调用后端搜索接口
+}
+
+// 从模板创建
+const handleAddFromTemplate = () => {
+  router.push('/adapter-catalog')
 }
 
 // 新增

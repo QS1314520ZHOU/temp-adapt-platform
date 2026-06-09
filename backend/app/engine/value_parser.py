@@ -112,9 +112,18 @@ class ValueParser:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _to_number(value: Any) -> Optional[float]:
+    def _to_number(value: Any) -> Any:
+        """Convert value to a number. Returns int when the value is a whole
+        number, float otherwise.  This avoids silently converting vital-sign
+        integers like pulse 80 into 80.0, which breaks downstream schema
+        validation and reconciliation."""
         try:
-            return float(value)
+            f = float(value)
+            i = int(f)
+            # Return int if the float has no fractional part.
+            if f == i:
+                return i
+            return f
         except (ValueError, TypeError):
             logger.warning("Cannot convert '%s' to number", value)
             return None

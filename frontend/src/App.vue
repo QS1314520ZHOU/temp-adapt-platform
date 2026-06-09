@@ -20,6 +20,10 @@
           <el-icon><OfficeBuilding /></el-icon>
           <span>厂家管理</span>
         </el-menu-item>
+        <el-menu-item index="/adapter-catalog">
+          <el-icon><Box /></el-icon>
+          <span>适配器目录</span>
+        </el-menu-item>
         <el-menu-item index="/access-config">
           <el-icon><Connection /></el-icon>
           <span>接入配置</span>
@@ -118,6 +122,7 @@ import {
   Promotion,
   Timer,
   Pointer,
+  Box,
 } from '@element-plus/icons-vue'
 
 const route = useRoute()

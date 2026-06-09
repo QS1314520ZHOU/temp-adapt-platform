@@ -1,6 +1,6 @@
 """Department / Ward configuration service."""
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from app.database import Database
@@ -32,7 +32,7 @@ class DepartmentService:
     def save_department(self, data: dict) -> dict:
         """Insert a new department config and return the created document."""
         col = Database.get_collection(self.COLLECTION)
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
 
         dept = DepartmentConfig(
             vendorCode=data.get("vendorCode"),
@@ -75,7 +75,7 @@ class DepartmentService:
             if key in data:
                 update_fields[key] = data[key]
 
-        update_fields["updatedAt"] = datetime.utcnow()
+        update_fields["updatedAt"] = datetime.now(timezone.utc)
         col.update_one({"_id": dept_id}, {"$set": update_fields})
         logger.info("Updated department config '%s'", dept_id)
         return col.find_one({"_id": dept_id})
@@ -99,7 +99,7 @@ class DepartmentService:
         new ones are inserted.
         """
         col = Database.get_collection(self.COLLECTION)
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         inserted = 0
         updated = 0
         errors = []

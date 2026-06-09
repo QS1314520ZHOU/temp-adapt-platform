@@ -1,13 +1,15 @@
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Optional
+
+from lxml import etree
 
 from app.engine.jsonpath_extractor import JsonPathExtractor
 from app.engine.rule_matcher import RuleMatcher
 from app.engine.value_parser import ValueParser
 from app.engine.xpath_extractor import XPathExtractor
-from app.utils.idempotent import make_idempotent_key
+from app.utils.idempotent import make_idempotent_key_safe
 
 logger = logging.getLogger(__name__)
 
@@ -58,12 +60,12 @@ class TransformEngine:
         errors: list[dict] = []
 
         try:
-            raw_records = self._extract_records(raw_data)
+            raw_records, parsed_data = self._extract_records(raw_data)
         except Exception as e:
             logger.error("Failed to extract records: %s", e)
             return self._build_result([], [], [{"error": str(e), "stage": "extract"}], 0, 0, 0)
 
-        root_fields = self._map_root_fields(raw_data)
+        root_fields = self._map_root_fields(raw_data, parsed_data)
 
         # Get item field mappings for value extraction
         item_field_mappings = self.parser_config.get("itemFieldMappings", {})
@@ -129,11 +131,12 @@ class TransformEngine:
                 temperature_record = self._build_temperature_record(
                     mapped_record, parsed_items, root_fields
                 )
-                temperature_record["idempotentKey"] = make_idempotent_key(
+                temperature_record["idempotentKey"] = make_idempotent_key_safe(
                     vendor_code,
                     str(mapped_record.get("visitNo", "")),
                     str(mapped_record.get("patientVisitId", "")),
                     str(mapped_record.get("recordTime", "")),
+                    payload=raw_data,
                 )
                 temperature_record["vendorCode"] = vendor_code
                 records.append(temperature_record)
@@ -157,36 +160,60 @@ class TransformEngine:
     # Internal helpers
     # ==================================================================
 
-    def _extract_records(self, raw_data: str) -> list[dict]:
+    def _extract_records(self, raw_data: str) -> tuple[list[dict], Any]:
         """Parse *raw_data* and extract individual record dicts using the
-        configured ``recordPath``."""
-        fmt = self.parser_config.get("format", "json").lower()
+        configured ``recordPath``.
+
+        Returns:
+            A tuple of ``(records, parsed_data)`` where *parsed_data* is the
+            full parsed object (JSON dict or raw XML string) needed by
+            :meth:`_map_root_fields`.  Previously this was stashed on
+            ``self._last_parsed``, which made the engine non-thread-safe.
+        """
+        fmt = self.parser_config.get("format") or self.parser_config.get("dataFormat", "json")
         record_path = self.parser_config.get("recordPath", "$")
 
         if fmt == "json":
             data = json.loads(raw_data)
-            # Stash parsed data for later use by _map_root_fields.
-            self._last_parsed = data
             matches = self._jsonpath.extract(data, record_path)
             if not matches:
                 logger.warning("recordPath '%s' matched nothing", record_path)
-                return []
+                return [], data
             # Each match should be a dict (a single record).
-            return [m if isinstance(m, dict) else {"_value": m} for m in matches]
+            records = []
+            for m in matches:
+                if isinstance(m, dict):
+                    records.append(m)
+                else:
+                    logger.warning(
+                        "recordPath '%s' returned a non-dict scalar (%s: %r); "
+                        "wrapped as {'_value': ...} -- field mappings will not "
+                        "match unless they target '_value'. Consider updating "
+                        "your recordPath to return objects.",
+                        record_path, type(m).__name__, m,
+                    )
+                    records.append({"_value": m})
+            return records, data
 
         if fmt == "xml":
             nodes = self._xpath.extract_from_string(raw_data, record_path)
-            self._last_parsed_xml = raw_data
-            return [{"_xml_node": node} for node in nodes]
+            return [{"_xml_node": node} for node in nodes], raw_data
 
         raise ValueError(f"Unsupported data format: '{fmt}'")
 
-    def _map_root_fields(self, raw_data: str) -> dict:
-        """Map root-level fields from the top-level parsed data."""
+    def _map_root_fields(self, raw_data: str, parsed_data: Any) -> dict:
+        """Map root-level fields from the top-level parsed data.
+
+        Args:
+            raw_data: The original raw string (used for XML re-parse fallback).
+            parsed_data: The already-parsed data from :meth:`_extract_records`.
+                For JSON this is the deserialised dict; for XML this is the
+                raw XML string.
+        """
         mappings: dict = self.parser_config.get("rootFieldMappings", {})
         result: dict = {}
 
-        fmt = self.parser_config.get("format", "json").lower()
+        fmt = self.parser_config.get("format") or self.parser_config.get("dataFormat", "json")
 
         for target_field, mapping in mappings.items():
             source_path = mapping.get("sourcePath") if isinstance(mapping, dict) else mapping
@@ -194,8 +221,7 @@ class TransformEngine:
                 continue
 
             if fmt == "json":
-                data = getattr(self, "_last_parsed", {})
-                value = self._jsonpath.extract_single(data, source_path)
+                value = self._jsonpath.extract_single(parsed_data, source_path)
             else:
                 nodes = self._xpath.extract_from_string(raw_data, source_path)
                 value = nodes[0] if nodes else None
@@ -206,9 +232,16 @@ class TransformEngine:
 
     def _map_record_fields(self, record: dict) -> dict:
         """Map fields within a single record according to
-        ``recordFieldMappings``."""
+        ``recordFieldMappings``.
+
+        Supports both JSON records (plain dicts) and XML records (dicts
+        with an ``_xml_node`` key containing an lxml node).
+        """
         mappings: dict = self.parser_config.get("recordFieldMappings", {})
         result: dict = {}
+
+        # Detect whether this is an XML-backed record.
+        xml_node = record.get("_xml_node")
 
         for target_field, mapping in mappings.items():
             # Support both sourceField and sourcePath keys
@@ -221,8 +254,15 @@ class TransformEngine:
             if not source_path:
                 continue
 
-            # Extract value using JsonPath if it starts with $, otherwise direct get
-            if isinstance(source_path, str) and source_path.startswith("$"):
+            # Extract value
+            value = None
+            if xml_node is not None:
+                # XML record: use XPath on the node.
+                nodes = self._xpath.extract_from_node(xml_node, source_path)
+                if nodes:
+                    first = nodes[0]
+                    value = first.text.strip() if hasattr(first, "text") and first.text else str(first)
+            elif isinstance(source_path, str) and source_path.startswith("$"):
                 value = self._jsonpath.extract_single(record, source_path)
             else:
                 value = record.get(source_path) if isinstance(record, dict) else None
@@ -248,7 +288,7 @@ class TransformEngine:
         if not item_path:
             return []
 
-        fmt = self.parser_config.get("format", "json").lower()
+        fmt = self.parser_config.get("format") or self.parser_config.get("dataFormat", "json")
 
         if fmt == "json":
             return self._jsonpath.extract(record, item_path) or []
@@ -257,14 +297,21 @@ class TransformEngine:
         node = record.get("_xml_node")
         if node is None:
             return []
-        nodes = self._xpath.extract_from_string(
-            # Re-serialise the node so we can reuse the same parser.
-            # In practice the XML extractor could accept a node directly.
-            "",  # placeholder -- see note below
-            item_path,
-        )
-        # NOTE: For XML items extracted from a subtree the caller may need to
-        # pass the sub-tree XML; this is a simplification.
+
+        if item_path == ".":
+            # Special case: itemPath "." means the record node itself IS the
+            # item container.  Each child element is treated as a separate item.
+            # This is the DHCC/EStatusParameter pattern where fields like
+            # Temperature, Pulse, etc. are direct child elements.
+            items = []
+            for child in node:
+                tag = etree.QName(child).localname if hasattr(child, 'tag') else str(child.tag)
+                text = child.text.strip() if child.text else ""
+                if text:
+                    items.append({"fieldName": tag, "value": text, "_xml_node": child})
+            return items
+
+        nodes = self._xpath.extract_from_node(node, item_path)
         return [{"_xml_node": n} for n in nodes]
 
     def _transform_value(self, value: Any, mapping: dict) -> Any:
@@ -274,10 +321,10 @@ class TransformEngine:
 
         result = self._value_parser.parse(value, data_type, date_format)
 
-        # Blood-pressure splitting: if the rule says this is a BP field.
-        if mapping.get("splitBloodPressure") and result is not None:
-            bp = self._value_parser.split_blood_pressure(str(result))
-            return bp if bp else result
+        # NOTE: Blood-pressure splitting is handled exclusively in the
+        # caller (transform main loop) via ``dataType == "blood_pressure"``.
+        # Do NOT split here -- the old ``splitBloodPressure`` branch caused
+        # a double-split when both conditions were true.
 
         # Regex extraction.
         regex_pattern = mapping.get("regexExtract")
@@ -303,7 +350,7 @@ class TransformEngine:
             **root_fields,
             **mapped_record,
             "items": items,
-            "createdAt": datetime.utcnow().isoformat(),
+            "createdAt": datetime.now(timezone.utc).isoformat(),
         }
         return record
 

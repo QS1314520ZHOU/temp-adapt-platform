@@ -1,7 +1,7 @@
 """Parser configuration management service."""
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from app.database import Database
@@ -30,7 +30,7 @@ class ParserConfigService:
     def save_config(self, data: dict) -> dict:
         """Insert or upsert a parser config and return the saved document."""
         col = Database.get_collection(COLLECTION)
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
 
         existing = col.find_one({"vendorCode": data["vendorCode"]})
 

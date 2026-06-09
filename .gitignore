@@ -28,7 +28,7 @@ Thumbs.db
 .env.local
 
 # MongoDB data
-data/
+/data/
 
 # Logs
 *.log

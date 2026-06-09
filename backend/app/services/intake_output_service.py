@@ -1,6 +1,6 @@
 """Intake/Output calculation and management service."""
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from app.database import Database
@@ -114,7 +114,7 @@ class IntakeOutputService:
             field_mappings=field_mappings,
         )
 
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         raw_bedside_ids = [
             str(r.get("_id", "")) for r in bedside_records if r.get("_id")
         ]
@@ -218,7 +218,7 @@ class IntakeOutputService:
             The saved item config document.
         """
         col = Database.get_collection(ITEM_CONFIGS_COLLECTION)
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
 
         ds_id = data.get("datasourceId", "")
         param_code = data.get("paramCode", "")
@@ -291,7 +291,7 @@ class IntakeOutputService:
             The saved stat rule document.
         """
         col = Database.get_collection(STAT_RULES_COLLECTION)
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
 
         ds_id = data.get("datasourceId", "")
         code = data.get("code", "")
@@ -397,6 +397,6 @@ class IntakeOutputService:
             "totalRecords": total_records,
             "resultCount": result_count,
             "unmatchedCount": unmatched_count,
-            "createdAt": datetime.utcnow(),
+            "createdAt": datetime.now(timezone.utc),
         }
         col.insert_one(log)

@@ -2,7 +2,7 @@
 import json
 import logging
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 import httpx
@@ -27,7 +27,7 @@ class CallbackService:
     def save_config(self, data: dict) -> dict:
         """Insert or update a callback config (upsert by vendorCode)."""
         col = Database.get_collection(self.COLLECTION)
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
 
         existing = col.find_one({"vendorCode": data["vendorCode"]})
         if existing:
@@ -225,7 +225,7 @@ class CallbackService:
                     "retryCount": retry_count,
                     "error": None,
                     "duration": duration,
-                    "updatedAt": datetime.utcnow(),
+                    "updatedAt": datetime.now(timezone.utc),
                 }},
             )
             return {"success": True, "logId": log_id, "statusCode": result["status_code"]}
@@ -240,7 +240,7 @@ class CallbackService:
                     "retryCount": retry_count,
                     "error": str(e),
                     "duration": duration,
-                    "updatedAt": datetime.utcnow(),
+                    "updatedAt": datetime.now(timezone.utc),
                 }},
             )
             return {"success": False, "logId": log_id, "error": str(e)}
